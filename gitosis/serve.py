@@ -211,27 +211,33 @@ class Main(app.App):
 
         main_log.debug('Serving %s', newcmd)
 
-        # execvp on gitosis-admin repo
-        repo = newcmd.split(' ')[-1].replace("'", "")
-        if repo.endswith('gitosis-admin.git'):
-            os.execvp('git', ['git', 'shell', '-c', newcmd])
-            main_log.error('Cannot execute git-shell.')
-            sys.exit(1)
+        # only use special hooks on git-receive-pack
+        if cmd.startswith('git-receive-pack'):
+            
+            # execvp on gitosis-admin repo
+            repo = newcmd.split(' ')[-1].replace("'", "")
+            if repo.endswith('gitosis-admin.git'):
+                os.execvp('git', ['git', 'shell', '-c', newcmd])
+                main_log.error('Cannot execute git-shell.')
+                sys.exit(1)
+    
+            # push hook
+            if cfg.has_option('gitosis', 'push_hook'):
+                push_hook = cfg.get('gitosis', 'push_hook')
+                main_log.debug('Running push hook: %s' % push_hook)
+                subprocess.check_output([push_hook, user])
+    
+            # process git-shell receive-pack, etc
+            subprocess.check_call(['git', 'shell', '-c', newcmd])
+    
+            # build hook
+            if cfg.has_option('gitosis', 'build_hook'):
+                build_hook = cfg.get('gitosis', 'build_hook')
+                main_log.debug('Running build hook: %s' % build_hook)
+                target_path = os.path.join(os.getcwd(), repo)
+                subprocess.check_call([build_hook, target_path, user], stdout=sys.stderr.fileno())
 
-        # push hook
-        if cfg.has_option('gitosis', 'push_hook'):
-            push_hook = cfg.get('gitosis', 'push_hook')
-            main_log.debug('Running push hook: %s' % push_hook)
-            subprocess.check_output([push_hook, user])
-
-        # process git-shell receive-pack, etc
-        subprocess.check_call(['git', 'shell', '-c', newcmd])
-
-        # build hook
-        if cfg.has_option('gitosis', 'build_hook'):
-            build_hook = cfg.get('gitosis', 'build_hook')
-            main_log.debug('Running build hook: %s' % build_hook)
-            target_path = os.path.join(os.getcwd(), repo)
-            subprocess.check_call([build_hook, target_path, user], stdout=sys.stderr.fileno())
-
+        else:
+            subprocess.check_call(['git', 'shell', '-c', newcmd])
+                
         sys.exit(0)
