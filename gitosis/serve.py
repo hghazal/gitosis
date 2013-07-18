@@ -235,7 +235,9 @@ class Main(app.App):
                 build_hook = cfg.get('gitosis', 'build_hook')
                 main_log.debug('Running build hook: %s' % build_hook)
                 target_path = os.path.join(os.getcwd(), repo)
-                subprocess.check_call([build_hook, target_path, user], stdout=sys.stderr.fileno())
+                p = subprocess.Popen([build_hook, target_path, user], stdout=sys.stderr.fileno())
+                rc = p.wait()
+                sys.exit(rc)
 
         else:
             subprocess.check_call(['git', 'shell', '-c', newcmd])
